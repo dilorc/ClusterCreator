@@ -2,8 +2,8 @@
 variable "clusters" {
   description = "Configuration details for each cluster."
   type = map(object({
-    cluster_name             : string                                                     # Required. Name is used in kubeconfig, cluster mesh, network name, k8s_vm_template pool. Must match the cluster name key. 14 character limit.
-    cluster_id               : number                                                     # Required. Acts as the vm_id and vlan prefix. This plus the vm start ip should always be over 100 because of how proxmox likes its vmids.
+    cluster_name             : string                                                     # Required. Name is used in kubeconfig, cluster mesh, network name, k8s_vm_template pool. Must match the cluster name key. 14 character limit
+    cluster_id               : string                                                     # Required. Acts as the vm_id and vlan prefix. This plus the vm start ip should always be over 100 because of how proxmox likes its vmids.
     kubeconfig_file_name     : string                                                     # Required. Name of the local kubeconfig file to be created. Assumed this will be in $HOME/.kube/
     start_on_proxmox_boot    : optional(bool, true)                                       # Optional. Whether or not to start the cluster's vms on proxmox boot
     max_pods_per_node        : optional(number, 512)                                      # Optional. Max pods per node. This should be a function of the quantity of IPs in you pod_cidr and number of nodes.
@@ -21,10 +21,10 @@ variable "clusters" {
       vlan_id                : optional(number, null)                                     # Optional. The vlan id to assign to the network interfaces of the VMs. Defaults to <cluster_id>00 (e.e. 100, 200, 300, etc.)
       vlan_name              : optional(string, null)                                     # Optional. The name of the VLAN in Unifi. Defaults to the cluster name in all caps.
       ipv4                   : object({
-        subnet_prefix        : optional(string, "10.0.0")                                 # Optional. First three octets of the host IPv4 network's subnet (assuming its a /24)
-        gateway              : optional(string, "10.0.0.1")                               # Optional. Gateway for vm hosts
+        subnet_prefix        : optional(string, "10.18.13")                                 # Optional. First three octets of the host IPv4 network's subnet (assuming its a /24)
+        gateway              : optional(string, "10.18.13.1")                               # Optional. Gateway for vm hosts
         pod_cidr             : optional(string, "10.42.0.0/16")                           # Optional. Cidr range for pod networking internal to cluster. Shouldn't overlap with ipv4 lan network. These must differ cluster to cluster if using clustermesh.
-        svc_cidr             : optional(string, "10.43.0.0/16")                           # Optional. Cidr range for service networking internal to cluster. Shouldn't overlap with ipv4 lan network.
+        svc_cidr             : optional(string, "10.43.0.0/16")                          # Optional. Cidr range for service networking internal to cluster. Shouldn't overlap with ipv4 lan network.
         dns1                 : optional(string, "1.1.1.1")                                # Optional. Primary dns server for vm hosts
         dns2                 : optional(string, "1.0.0.1")                                # Optional. Secondary dns server for vm hosts
         management_cidrs     : optional(string, "")                                       # Optional. Proxmox list of ipv4 IPs or cidrs that you want to be able to reach the K8s api and ssh into the hosts. Only used if use_pve_firewall is true.
@@ -52,7 +52,7 @@ variable "clusters" {
     })
     node_classes             : map(object({
       count                  : number                                                     # Required. Number of VMs to create for this node class.
-      pve_nodes              : optional(list(string),["Citadel","Acropolis","Parthenon"]) # Optional. Nodes that this class is allowed to run on. They will be cycled through and will repeat if count > length(pve_nodes).
+      pve_nodes              : optional(list(string),["prox-wirespeed"]) # Optional. Nodes that this class is allowed to run on. They will be cycled through and will repeat if count > length(pve_nodes).
       machine                : optional(string, "q35")                                    # Optional. Default to "q35". Use i400fx for partial gpu pass-through.
       cpu_type               : optional(string, "x86-64-v3")                              # Optional. Default to x86-64-v3. 'host' gives the best performance and is needed for full gpu pass-through, but it can't live migrate. https://www.yinfor.com/2023/06/how-i-choose-vm-cpu-type-in-proxmox-ve.html
       cores                  : optional(number, 2)                                        # Optional. Number of cores to use.
@@ -83,30 +83,30 @@ variable "clusters" {
       kubeconfig_file_name     = "alpha.yml"
       start_on_proxmox_boot    = false
       ssh = {
-        ssh_user               = "line6"
+        ssh_user               = "debian"
       }
       networking = {
+        vlan_id = 0
         ipv4 = {
-          subnet_prefix        = "10.0.1"
-          gateway              = "10.0.1.1"
-          management_cidrs     = "10.0.0.0/30,10.0.60.2,10.0.50.5,10.0.50.6"
-          lb_cidrs             = "10.0.1.200/29,10.0.1.208/28,10.0.1.224/28,10.0.1.240/29,10.0.1.248/30,10.0.1.252/31"
+          subnet_prefix        = "10.18.13"
+          gateway              = "10.18.13.1"
+          lb_cidrs             = "10.18.13.240/28"
         }
         ipv6 = {}
         kube_vip = {
-          vip                  = "10.0.1.100"
+          vip                  = "10.18.13.201"
           vip_hostname         = "alpha-api-server"
         }
       }
       node_classes = {
         controlplane = {
           count      = 1
-          cores      = 16
-          memory     = 16384
+          cores      = 8
+          memory     = 8192
           disks      = [
-            { datastore = "local-btrfs", size = 100 }
+            { datastore = "local-zfs", size = 100 }
           ]
-          start_ip   = 110
+          start_ip   = 202
           labels = [
             "nodeclass=controlplane"
           ]
@@ -119,30 +119,30 @@ variable "clusters" {
       kubeconfig_file_name     = "beta.yml"
       start_on_proxmox_boot    = false
       ssh = {
-        ssh_user               = "line6"
+        ssh_user               = "debian"
       }
       networking = {
+        vlan_id                = 0
         ipv4 = {
-          subnet_prefix        = "10.0.2"
-          gateway              = "10.0.2.1"
-          management_cidrs     = "10.0.0.0/30,10.0.60.2,10.0.50.5,10.0.50.6"
-          lb_cidrs             = "10.0.2.200/29,10.0.2.208/28,10.0.2.224/28,10.0.2.240/29,10.0.2.248/30,10.0.2.252/31"
+          subnet_prefix        = "10.18.13"
+          gateway              = "10.18.13.1"
+          lb_cidrs             = "10.18.13.224/28"
         }
         ipv6 = {}
         kube_vip = {
-          vip                  = "10.0.2.100"
+          vip                  = "10.18.13.203"
           vip_hostname         = "beta-api-server"
         }
       }
       node_classes = {
         controlplane = {
-          count      = 1
+          count      = 3
           cores      = 4
           memory     = 4096
           disks      = [
-            { datastore = "local-btrfs", size = 20 }
+            { datastore = "local-zfs", size = 20 }
           ]
-          start_ip   = 110
+          start_ip   = 204
           labels = [
             "nodeclass=controlplane"
           ]
@@ -152,9 +152,9 @@ variable "clusters" {
           cores      = 8
           memory     = 4096
           disks      = [
-            { datastore = "local-btrfs", size = 20 }
+            { datastore = "local-zfs", size = 20 }
           ]
-          start_ip   = 130
+          start_ip   = 211
           labels = [
             "nodeclass=general"
           ]
